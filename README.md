@@ -59,7 +59,7 @@ The implemented model uses:
 
 To address class imbalance, the network is trained with **class weights**, which penalize mistakes on defaulted loans more heavily than mistakes on non-default loans. This prevents the model from collapsing into a majority-class predictor.
 
-### Phase 2 Results
+### Phase 2 - Neural Network - Results
 
 The latest saved neural-network run still showed useful ranking ability during training, with validation AUC reaching approximately **0.82**. This indicates that the model is learning signal above random chance, but the classification behavior at specific thresholds changed noticeably compared with the earlier run.
 
@@ -73,7 +73,7 @@ At the default decision threshold of `0.5`, the saved evaluation in the notebook
 
 These results show that the model's probability ranking is still stronger than its hard class predictions at the default cutoff. In other words, the network appears to separate examples reasonably well in terms of score ordering, but the `0.5` threshold is no longer producing the strongest classification behavior.
 
-### Threshold Strategy
+### Phase 2 - Neural Network - Threshold Strategy
 
 Because credit-risk prediction is sensitive to the cost of false positives and false negatives, the model was also evaluated across several probability thresholds instead of relying only on the default cutoff of `0.5`.
 
