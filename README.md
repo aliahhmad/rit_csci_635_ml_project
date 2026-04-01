@@ -56,50 +56,60 @@ The implemented model uses:
 - **Loss** — `binary_crossentropy`
 - **Optimizer** — Adam with learning rate `1e-3`
 - **Metrics** — Accuracy, Precision, Recall, and AUC
+- **Training setup** — `validation_split=0.2`, `batch_size=256`, maximum `20` epochs
+- **Regularization / stopping** — Early stopping on `val_loss` with `patience=5` and `restore_best_weights=True`
 
 To address class imbalance, the network is trained with **class weights**, which penalize mistakes on defaulted loans more heavily than mistakes on non-default loans. This prevents the model from collapsing into a majority-class predictor.
 
 ### Phase 2 - Neural Network - Results
 
-The latest saved neural-network run still showed useful ranking ability during training, with validation AUC reaching approximately **0.82**. This indicates that the model is learning signal above random chance, but the classification behavior at specific thresholds changed noticeably compared with the earlier run.
+The latest neural-network run uses **early stopping** to monitor validation loss and restore the best weights instead of keeping the final epoch blindly. In practice, training stopped after **13 / 20** epochs, which helps reduce overfitting while preserving the strongest validation checkpoint.
+
+During training, the model reached:
+
+- **Best validation loss** — `0.3987`
+- **Validation accuracy** — `0.7823`
+- **Validation AUC** — approximately `0.826`
+- **Validation precision** — `0.9664`
+- **Validation recall** — `0.7899`
+
+These results show that the model is learning meaningful ranking signal and that early stopping keeps the best-performing validation state.
 
 At the default decision threshold of `0.5`, the saved evaluation in the notebook reported:
 
-- **Accuracy** — `0.39`
-- **Class 0 (default)** — Precision `0.13`, Recall `0.65`, F1 `0.21`
-- **Class 1 (non-default)** — Precision `0.87`, Recall `0.35`, F1 `0.50`
-- **Macro F1** — `0.35`
-- **Weighted F1** — `0.46`
+- **Accuracy** — `0.65`
+- **Class 0 (default)** — Precision `0.22`, Recall `0.67`, F1 `0.33`
+- **Class 1 (non-default)** — Precision `0.93`, Recall `0.65`, F1 `0.76`
+- **Macro F1** — `0.55`
+- **Weighted F1** — `0.71`
 
-These results show that the model's probability ranking is still stronger than its hard class predictions at the default cutoff. In other words, the network appears to separate examples reasonably well in terms of score ordering, but the `0.5` threshold is no longer producing the strongest classification behavior.
+Compared with the earlier README version, these results are substantially stronger and more stable. The network now captures a meaningful share of the default class while still maintaining high precision on the non-default class.
 
 ### Phase 2 - Neural Network - Threshold Strategy
 
 Because credit-risk prediction is sensitive to the cost of false positives and false negatives, the model was also evaluated across several probability thresholds instead of relying only on the default cutoff of `0.5`.
 
-| Threshold | Precision | Recall | F1-score |
-|------|------|------|------|
-| `0.3` | `0.8717` | `1.0000` | `0.9315` |
-| `0.4` | `0.8718` | `0.9988` | `0.9310` |
-| `0.5` | `0.8703` | `0.3476` | `0.4968` |
-| `0.6` | `0.7500` | `0.0000` | `0.0000` |
-| `0.7` | `0.0000` | `0.0000` | `0.0000` |
-| `0.8` | `0.0000` | `0.0000` | `0.0000` |
+| Threshold | Precision | Recall | F1-score | Approved Loans (`TP + FP`) | Bad Approvals (`FP`) |
+|------|------|------|------|------|------|
+| `0.3` | `0.8908` | `0.9340` | `0.9119` | `517,883` | `56,536` |
+| `0.4` | `0.9097` | `0.8152` | `0.8599` | `442,631` | `39,955` |
+| `0.5` | `0.9298` | `0.6490` | `0.7644` | `344,760` | `24,194` |
+| `0.6` | `0.9461` | `0.4888` | `0.6446` | `255,220` | `13,769` |
+| `0.7` | `0.9607` | `0.3299` | `0.4912` | `169,637` | `6,670` |
+| `0.8` | `0.9736` | `0.1961` | `0.3265` | `99,504` | `2,628` |
 
 This threshold sweep showed a clear tradeoff:
 
-- Lower thresholds improve recall and F1-score
-- Higher thresholds improve precision but reduce recall
+- Lower thresholds approve more loans and improve recall / F1-score
+- Higher thresholds improve precision and reduce bad approvals, but they also reject more potentially good loans
 
-However, the latest run also shows that very low thresholds can become too permissive. At `0.3`, the model approves essentially every loan, which creates perfect or near-perfect recall for the non-default class but is not a realistic bank strategy because it also allows a large number of bad approvals.
+The updated results make the tradeoff much easier to interpret from a banking perspective:
 
-This means the threshold sweep is still valuable, but it should now be interpreted as a business tradeoff study rather than proof that the lowest threshold is best. In the current run:
+- `0.3` delivers the highest recall and F1-score, but it also creates the most bad approvals
+- `0.5` is a balanced middle ground with strong precision (`0.9298`) and substantially fewer bad approvals than `0.3`
+- `0.7` and `0.8` are much more conservative and sharply reduce the number of approvals, which may be desirable if minimizing risky approvals matters most
 
-- `0.3` and `0.4` maximize recall and F1, but they are extremely aggressive
-- `0.5` is more selective, though recall drops sharply
-- `0.6+` becomes too conservative and effectively stops approving loans
-
-The main takeaway is that threshold tuning remains important, but the latest results suggest the model needs additional calibration or tuning before a final deployment threshold can be recommended confidently.
+The main takeaway is that **threshold tuning remains a business decision**, not just a modeling decision. Early stopping improved training stability, and the updated results now show a more credible range of operating points for different lending strategies.
 
 ---
 
