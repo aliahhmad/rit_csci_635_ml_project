@@ -174,6 +174,105 @@ Top features by positive coefficient magnitude:
 
 ---
 
+## Phase 2 — XGBoost
+
+Phase 2 also trains an XGBoost gradient-boosted tree ensemble on the preprocessed Lending Club features for binary loan default prediction.
+
+### Phase 2 - XGBoost - Feature Engineering
+
+Several modifications were made to the base preprocessed features before training:
+
+- **Restored ablation columns** — `int_rate`, `installment`, and `open_acc` were dropped in Phase 1 based on the paper's logistic regression ablation study. XGBoost handles noisy/correlated features natively, so these were restored and NaN-filled with train-set medians.
+- **Dropped grade/subgrade columns** — 40 one-hot grade and subgrade columns were removed. When left in, the model's top features were almost entirely grade columns (i.e., just re-predicting Lending Club's own internal risk score). Dropping them forces the model to find signal in actual borrower data. `int_rate` is kept as a continuous proxy since it captures non-linear splits that the categorical encoding cannot.
+- **Derived features** — 11 engineered features were added on top of the 130 remaining columns (final shape: 138 features):
+
+| Feature | Description |
+|---|---|
+| `loan_to_income` | Loan amount / (annual income + 1) |
+| `fico_mid` | Midpoint of FICO range low/high |
+| `revol_util_frac` | Revolving utilization as a fraction (÷ 100) |
+| `cr_history_months` | Issue date − earliest credit line date |
+| `payment_to_income` | Monthly installment / (monthly income + 1) |
+| `revol_bal_to_inc` | Revolving balance / (annual income + 1) |
+| `derog_marks` | Public records + delinquencies in 2 years |
+| `inq_per_account` | Inquiries last 6 months / (open accounts + 1) |
+| `monthly_debt` | DTI × annual income / 1200 |
+| `closed_acc_ratio` | (Total accounts − open accounts) / (total accounts + 1) |
+
+### Phase 2 - XGBoost - Training Setup
+
+The model was trained on the **natural class distribution** (78.6% non-default, 21.4% default) with **no sample weights**. A prior run using 3.68× sample weights on defaults destroyed performance — AUC dropped to 0.735 and G-mean to 67.2% because the weights warped the probability surface so that the model output ~0.5 for almost everything. Threshold tuning (see below) is the correct tool for adjusting sensitivity/specificity, not reweighting.
+
+**Round 1** used a learning rate of `0.05` with early stopping to identify the optimal number of trees (~999 rounds, best AUC `0.7341`).
+
+**Hyperparameter tuning** ran a 108-config grid search over:
+
+| Parameter | Values |
+|---|---|
+| `max_depth` | 4, 6, 8 |
+| `min_child_weight` | 20, 50, 100 |
+| `subsample` | 0.7, 0.8 |
+| `colsample_bytree` | 0.6, 0.8 |
+| `gamma` | 0, 1, 5 |
+
+### Phase 2 - XGBoost - Final Model Parameters
+
+The best configuration from tuning was retrained at a lower learning rate of `0.02` for up to 3,000 rounds:
+
+| Parameter | Value |
+|---|---|
+| `objective` | `binary:logistic` |
+| `eval_metric` | `auc` |
+| `max_depth` | `8` |
+| `min_child_weight` | `100` |
+| `subsample` | `0.8` |
+| `colsample_bytree` | `0.8` |
+| `gamma` | `1.0` |
+| `reg_alpha` | `0.1` |
+| `reg_lambda` | `1.0` |
+| `learning_rate` | `0.02` |
+| Best boosting round | `2222` |
+
+### Phase 2 - XGBoost - Results
+
+**ROC-AUC: `0.7354`**
+
+At the default decision threshold of `0.50`:
+
+| Metric | Value |
+|---|---|
+| Accuracy | `79.2%` |
+| Precision | `80.6%` |
+| Sensitivity (Recall) | `96.7%` |
+| Specificity | `15.8%` |
+| G-mean | `39.2%` |
+
+The high sensitivity / low specificity at `0.5` reflects the natural class imbalance: the model is conservative about flagging defaults at this threshold.
+
+### Phase 2 - XGBoost - Threshold Sweep
+
+A sweep from threshold `0.10` to `0.90` (step `0.01`) identified the operating point that maximizes G-mean (geometric mean of sensitivity and specificity):
+
+| | Threshold | Accuracy | Precision | Sensitivity | Specificity | G-mean |
+|---|---|---|---|---|---|---|
+| Best G-mean | `0.77` | `67.3%` | `88.1%` | `67.3%` | `67.0%` | `67.2%` |
+| Best Specificity | `0.90` | `43.0%` | `93.8%` | `29.2%` | `93.0%` | `52.1%` |
+
+### Phase 2 - XGBoost - Comparison with Paper
+
+Results at the best G-mean threshold (`0.77`) vs. the CS229 paper's reported figures:
+
+| Model | Accuracy | Precision | Sensitivity | Specificity | G-mean |
+|---|---|---|---|---|---|
+| Logistic Regression (paper) | 92.8% | 96.6% | 95.1% | 77.1% | 85.7% |
+| Gaussian Naive Bayes (paper) | 91.1% | 96.6% | 92.7% | 80.4% | 86.3% |
+| SVM Linear (paper) | 93.7% | 96.9% | 96.3% | 78.0% | 86.7% |
+| **XGBoost (ours)** | **67.3%** | **88.1%** | **67.3%** | **67.0%** | **67.2%** |
+
+XGBoost underperforms the paper's models on all metrics. The gap likely stems from the paper using a different dataset split (and possibly including grade features), while our setup explicitly drops grade/subgrade to force learning from raw borrower attributes. The model achieves a competitive AUC of `0.7354` but has not closed the specificity gap.
+
+---
+
 ## Dependencies
 
 ```
@@ -181,6 +280,8 @@ pandas
 numpy
 scikit-learn
 nltk
+xgboost
+matplotlib
 ```
 
 ---
