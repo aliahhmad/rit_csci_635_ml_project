@@ -113,6 +113,67 @@ The main takeaway is that **threshold tuning remains a business decision**, not 
 
 ---
 
+## Phase 2 — Logistic Regression
+
+Phase 2 also trains a Logistic Regression baseline on the preprocessed, scaled Lending Club feature set (`X_train_scaled.csv`, `X_test_scaled.csv`).  
+The implementation uses:
+
+- **Solver** — `newton-cg`
+- **Class weighting** — `class_weight='balanced'`
+- **Convergence tolerance** — `1e-4`
+
+### Phase 2 - Logistic Regression - Optimization
+
+Newton's method converged successfully at iteration **6** with:
+
+- **Final loss** — `0.5866`
+- **Max gradient at convergence** — `3.1229e-05`
+
+### Phase 2 - Logistic Regression - Threshold Evaluation
+
+Classification reports were generated at thresholds `0.3`, `0.4`, `0.5`, and `0.6`.  
+Below are class-wise F1 and overall accuracy from the notebook output:
+
+| Threshold | Accuracy | F1 (Class 0: Default) | F1 (Class 1: Non-default) |
+|------|------|------|------|
+| `0.3` | `0.80` | `0.27` | `0.88` |
+| `0.4` | `0.73` | `0.30` | `0.83` |
+| `0.5` | `0.64` | `0.31` | `0.76` |
+| `0.6` | `0.52` | `0.30` | `0.64` |
+
+Observed tradeoff from the run:
+
+- As threshold increases, the model becomes more conservative on predicting non-default (`1`)
+- **Precision for class 1 increases** while **recall for class 1 decreases**
+- Recall for default class (`0`) increases as the threshold rises
+
+### Phase 2 - Logistic Regression - Final Metrics (0.5 threshold)
+
+- **Accuracy** — `0.6417`
+- **Precision** — `0.9223`
+- **Recall** — `0.6432`
+- **F1-score** — `0.7578`
+- **AUC-ROC** — `0.6910`
+
+### Phase 2 - Logistic Regression - Top Positive Coefficients
+
+Top features by positive coefficient magnitude:
+
+| Feature | Coefficient |
+|------|------|
+| `total_bc_limit` | `3.996128` |
+| `num_tl_90g_dpd_24m` | `1.894668` |
+| `total_il_high_credit_limit` | `1.741458` |
+| `tot_hi_cred_lim` | `1.497507` |
+| `mort_acc` | `1.094652` |
+| `num_actv_rev_tl` | `1.072439` |
+| `issue_d` | `0.877694` |
+| `mo_sin_old_rev_tl_op` | `0.678206` |
+| `revol_bal` | `0.633575` |
+| `earliest_cr_line` | `0.604793` |
+
+---
+
 ## Dependencies
 
 ```
