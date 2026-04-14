@@ -1,4 +1,5 @@
 # Predicting Default Risk of Lending Club Loans
+
 ### CSCI-635 | Machine Learning
 
 ---
@@ -36,11 +37,11 @@ The pipeline prepares the raw data for binary classification. The key steps are:
 
 ## Output Files (Phase 1)
 
-| File | Description |
-|------|-------------|
-| `X_train.csv` / `X_test.csv` | Unscaled features — for tree-based models and Naive Bayes |
+| File                                       | Description                                               |
+| ------------------------------------------ | --------------------------------------------------------- |
+| `X_train.csv` / `X_test.csv`               | Unscaled features — for tree-based models and Naive Bayes |
 | `X_train_scaled.csv` / `X_test_scaled.csv` | [-1, 1] scaled features — for SVM and Logistic Regression |
-| `y_train.csv` / `y_test.csv` | Binary labels (1 = non-default, 0 = default) |
+| `y_train.csv` / `y_test.csv`               | Binary labels (1 = non-default, 0 = default)              |
 
 ---
 
@@ -104,13 +105,32 @@ All three models were evaluated on the same preprocessed test split. Reported me
 
 ### Phase 2 Summary (Consistent Comparison at `0.5`)
 
-| Model | Accuracy | Precision | Recall | F1-score | ROC-AUC | Avg Precision |
-|---|---:|---:|---:|---:|---:|---:|
-| Logistic Regression | `0.6362` | `0.9152` | `0.6421` | `0.7547` | `0.6713` | `0.9305` |
-| Neural Network | `0.6804` | `0.9184` | `0.6952` | `0.7913` | `0.6958` | `0.9358` |
-| XGBoost | `0.6374` | `0.9332` | `0.6290` | `0.7515` | `0.7204` | `0.9422` |
+| Model               | Accuracy | Precision |   Recall | F1-score |  ROC-AUC | Avg Precision |
+| ------------------- | -------: | --------: | -------: | -------: | -------: | ------------: |
+| Logistic Regression | `0.6362` |  `0.9152` | `0.6421` | `0.7547` | `0.6713` |      `0.9305` |
+| Neural Network      | `0.6804` |  `0.9184` | `0.6952` | `0.7913` | `0.6958` |      `0.9358` |
+| XGBoost             | `0.6374` |  `0.9332` | `0.6290` | `0.7515` | `0.7204` |      `0.9422` |
 
 At threshold `0.5`, the Neural Network has the strongest overall balance (accuracy, recall, and F1), while XGBoost has the highest precision and ranking metrics (ROC-AUC and average precision).
+
+---
+
+## Phase 3 — Results and Evaluation
+
+Phase 3 consolidates the saved Phase 2 model outputs into a final comparison workflow. The evaluation notebook loads each model's `2026-04-10` summary and threshold files, combines the metrics, generates visual comparisons, and exports a final model comparison table.
+
+### Phase 3 Evaluation Artifacts
+
+| File                                             | Description                                      |
+| ------------------------------------------------ | ------------------------------------------------ |
+| `Phase_3_Results_And_Evaluation.ipynb`           | Notebook for combined model evaluation           |
+| `results/plots_combined.py`                      | Script version of the combined plotting workflow |
+| `results/plots/final_model_comparison_table.csv` | Final summary table sorted by ROC-AUC            |
+| `results/plots/model_comparison_bar.png`         | Bar chart comparing model metrics at threshold 0.5 |
+| `results/plots/precision_recall_curve.png`       | Precision-recall curves across thresholds        |
+| `results/plots/f1_threshold_comparison.png`      | F1-score trends across probability thresholds    |
+| `results/plots/confusion_matrices_grid.png`      | Confusion matrices for all three models          |
+| `results/plots/roc_curve_comparison.png`         | ROC curve comparison for all three models        |
 
 ---
 
@@ -123,6 +143,7 @@ scikit-learn
 nltk
 xgboost
 matplotlib
+seaborn
 ```
 
 ---
