@@ -31,7 +31,11 @@ The pipeline prepares the raw data for binary classification. The key steps are:
 - **Feature ablation** — Drop features identified in the paper as hurting model specificity
 - **Encoding** — One-hot encode low-cardinality categorical columns
 - **Train/test split** — 70/30 time-ordered split (no shuffle) to prevent future-data leakage
-- **Scaling** — MinMaxScaler to [-1, 1], fit on training data only, for use with SVM and Logistic Regression
+- **Scaling** — MinMaxScaler to [-1, 1], fit on training data only, for use with Logistic Regression and the Neural Network
+
+### Phase 1 Validation
+
+Validation in preprocessing focused on preventing leakage. The train/test split was time-ordered rather than shuffled, so later loans were held out as the test period. The scaler was fit only on the training data and then applied to the test data, which prevents information from the test set from influencing feature scaling.
 
 ---
 
@@ -40,54 +44,60 @@ The pipeline prepares the raw data for binary classification. The key steps are:
 | File                                       | Description                                               |
 | ------------------------------------------ | --------------------------------------------------------- |
 | `X_train.csv` / `X_test.csv`               | Unscaled features — for tree-based models and Naive Bayes |
-| `X_train_scaled.csv` / `X_test_scaled.csv` | [-1, 1] scaled features — for SVM and Logistic Regression |
+| `X_train_scaled.csv` / `X_test_scaled.csv` | [-1, 1] scaled features — for Logistic Regression and Neural Network |
 | `y_train.csv` / `y_test.csv`               | Binary labels (1 = non-default, 0 = default)              |
 
 ---
 
 ## Phase 2 — Model Training and Results
 
-All three models were evaluated on the same preprocessed test split. Reported metrics below use the latest saved run files in `results/` dated `2026-04-10`.
+All three models were evaluated on the same preprocessed test split. Reported metrics below use the latest saved run files in `results/` dated `2026-04-22`.
 
 ### 1) Logistic Regression
 
-**Setup (short):** trained on scaled features (`X_train_scaled.csv`) with class balancing.
+**Setup (short):** trained on scaled features (`X_train_scaled.csv`) with hyperparameter tuning for regularization strength, solver choice, and class weighting.
+
+**Validation:** Logistic Regression uses a manual grid search with stratified holdout validation. The training set is split into a training subset and validation subset, preserving class balance. Candidate settings are ranked by validation AUC, then the best configuration is retrained on the full training set before final test evaluation.
 
 **Latest results at threshold `0.5`:**
 
-- Accuracy: `0.6362`
+- Accuracy: `0.6363`
 - Precision: `0.9152`
-- Recall: `0.6421`
-- F1-score: `0.7547`
-- ROC-AUC: `0.6713`
-- Average Precision: `0.9305`
+- Recall: `0.6423`
+- F1-score: `0.7548`
+- ROC-AUC: `0.6715`
+- Average Precision: `0.9306`
 
 **Threshold behavior:**
 
-- At `0.3`, recall rises to `0.8702` but bad approvals increase to `52,627`
-- At `0.6`, precision rises to `0.9331` and bad approvals drop to `17,095`, with lower recall (`0.4828`)
+- At `0.3`, recall rises to `0.8702` but bad approvals increase to `52,625`
+- At `0.6`, precision rises to `0.9331` and bad approvals drop to `17,093`, with lower recall (`0.4830`)
 
 ### 2) Neural Network (MLP)
 
-**Setup (short):** dense MLP on scaled features with class-aware training.
+**Setup (short):** dense MLP on scaled features with class-aware training, dropout, early stopping, and tuned architecture/training parameters.
+
+**Validation:** The MLP uses a manual hyperparameter search with stratified holdout validation. Several combinations of hidden-layer structure, dropout, learning rate, and batch size are trained on the training subset and compared using validation AUC. This is not k-fold cross-validation; each configuration is evaluated on one stratified validation split. The selected configuration is retrained as the final MLP before test evaluation.
 
 **Latest results at threshold `0.5`:**
 
-- Accuracy: `0.6804`
-- Precision: `0.9184`
-- Recall: `0.6952`
-- F1-score: `0.7913`
-- ROC-AUC: `0.6958`
-- Average Precision: `0.9358`
+- Accuracy: `0.6470`
+- Precision: `0.9258`
+- Recall: `0.6468`
+- F1-score: `0.7616`
+- ROC-AUC: `0.7035`
+- Average Precision: `0.9374`
 
 **Threshold behavior:**
 
-- At `0.3`, recall is very high (`0.9699`) but bad approvals increase to `64,823`
-- At `0.6`, precision improves to `0.9380` and bad approvals fall to `15,905`, with recall reduced to `0.4868`
+- At `0.3`, recall is high (`0.9359`) but bad approvals increase to `57,717`
+- At `0.6`, precision improves to `0.9432` and bad approvals fall to `13,508`, with recall reduced to `0.4545`
 
 ### 3) XGBoost
 
-**Setup (short):** gradient-boosted trees on engineered tabular features.
+**Setup (short):** gradient-boosted trees on engineered tabular features with row weighting for the minority default class.
+
+**Validation:** XGBoost uses a manual grid search with early stopping. A smaller class-balanced tuning subset is created to speed up experimentation, candidate tree configurations are compared using AUC, and early stopping selects an appropriate boosting round. The best parameter set is then used to train the final XGBoost model before evaluation on the full test split.
 
 **Latest results at threshold `0.5`:**
 
@@ -107,17 +117,21 @@ All three models were evaluated on the same preprocessed test split. Reported me
 
 | Model               | Accuracy | Precision |   Recall | F1-score |  ROC-AUC | Avg Precision |
 | ------------------- | -------: | --------: | -------: | -------: | -------: | ------------: |
-| Logistic Regression | `0.6362` |  `0.9152` | `0.6421` | `0.7547` | `0.6713` |      `0.9305` |
-| Neural Network      | `0.6804` |  `0.9184` | `0.6952` | `0.7913` | `0.6958` |      `0.9358` |
+| Logistic Regression | `0.6363` |  `0.9152` | `0.6423` | `0.7548` | `0.6715` |      `0.9306` |
+| Neural Network      | `0.6470` |  `0.9258` | `0.6468` | `0.7616` | `0.7035` |      `0.9374` |
 | XGBoost             | `0.6374` |  `0.9332` | `0.6290` | `0.7515` | `0.7204` |      `0.9422` |
 
-At threshold `0.5`, the Neural Network has the strongest overall balance (accuracy, recall, and F1), while XGBoost has the highest precision and ranking metrics (ROC-AUC and average precision).
+At threshold `0.5`, the Neural Network has the strongest F1-score and recall, while XGBoost has the highest precision and ranking metrics (ROC-AUC and average precision). Logistic Regression remains the simplest and most interpretable baseline, with performance close to the other models after tuning.
 
 ---
 
 ## Phase 3 — Results and Evaluation
 
-Phase 3 consolidates the saved Phase 2 model outputs into a final comparison workflow. The evaluation notebook loads each model's `2026-04-10` summary and threshold files, combines the metrics, generates visual comparisons, and exports a final model comparison table.
+Phase 3 consolidates the saved Phase 2 model outputs into a final comparison workflow. The evaluation notebook loads each model's `2026-04-22` summary and threshold files, combines the metrics, generates visual comparisons, and exports a final model comparison table.
+
+### Phase 3 Validation
+
+Phase 3 validates consistency across models by comparing them on the same held-out test split and the same threshold grid. The summary files compare default-threshold performance at `0.5`, while the threshold files compare how each model behaves as the approval cutoff changes from `0.3` to `0.8`.
 
 ### Phase 3 Evaluation Artifacts
 
